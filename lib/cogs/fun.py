@@ -1,9 +1,14 @@
+from asyncio import sleep
+from io import BytesIO
 from random import choice, randint
+
+import discord
+from aiohttp import request
 
 from discord.ext.commands import Cog, BadArgument
 from discord.ext.commands import command
 from discord.errors import HTTPException
-from discord import Member
+from discord import Member, Embed
 from typing import Optional
 
 
@@ -46,6 +51,8 @@ class Fun(Cog):
         if member.id == self.bot.user.id:
             await ctx.send(f"{self.bot.user} slapped {ctx.author.name} for fun!")
         else:
+            # to give the message time to process and load fully
+            await sleep(1)
             await ctx.message.delete()
             await ctx.send(f"{ctx.author.name} slapped {member.display_name} {reason}!")
 
@@ -59,6 +66,44 @@ class Fun(Cog):
     async def echo_message(self, ctx, *, message):
         await ctx.message.delete()
         await ctx.send(message)
+
+    # First direct API request.  We load the URL, with the specific API which spits bad a string of raw data, then load
+    # and use that if a positive status (200) is returned
+    @command(name="fact")
+    async def animal_fact(self, ctx, animal: str):
+        if animal.lower() in ("dog", "cat", "panda", "fox", "bird", "koala"):
+            URL = f"https://some-random-api.ml/facts/{animal.lower()}"
+
+            async with request("GET", URL, headers={}) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    embed = Embed(title=f"{animal.title()} fact",
+                                  description=data["fact"],
+                                  color=ctx.author.colour)
+                    await ctx.send(embed=embed)
+# old way, just passing the fact, now we are embedding it
+#                    await ctx.send(data["fact"])
+                else:
+                    await ctx.send(f"API returned a {response.status} status")
+        else:
+            await ctx.send("No facts are available for that animal")
+
+    # We call the api and affix the pokemon name
+    # once we have the postive hit via to 200 status, we can then load the data into pokemon data, then directly
+    # reference the individual fields needed which are available in their api documentation.
+    #
+    @command(name="pokemon")
+    async def pokemon_fact(self, ctx, pokemonname: str):
+        URL = f"https://pokeapi.co/api/v2/pokemon/{pokemonname.lower()}"
+        async with request("GET", URL, headers={}) as response:
+            if response.status == 200:
+                pokemondata = await response.json()
+                name = pokemondata["name"]
+                height = pokemondata["height"] / 10
+                weight = pokemondata["weight"] / 10
+                await ctx.send(f"{name} weighs {weight}kg and is {height} meters tall")
+            else:
+                await ctx.send(f"API returned a {response.status} status")
 
     @Cog.listener()
     async def on_ready(self):
