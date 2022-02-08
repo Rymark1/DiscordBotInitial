@@ -71,15 +71,25 @@ class Fun(Cog):
     # and use that if a positive status (200) is returned
     @command(name="fact")
     async def animal_fact(self, ctx, animal: str):
-        if animal.lower() in ("dog", "cat", "panda", "fox", "bird", "koala"):
-            URL = f"https://some-random-api.ml/facts/{animal.lower()}"
+        if (animal := animal.lower()) in ("dog", "cat", "panda", "fox", "bird", "koala"):
+            fact_url = f"https://some-random-api.ml/facts/{animal}"
+            image_url = f"https://some-random-api.ml/img/{'birb' if animal == 'bird' else animal}"
 
-            async with request("GET", URL, headers={}) as response:
+            async with request("GET", image_url,headers={}) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    image_link = data["link"]
+                else:
+                    image_link = None
+
+            async with request("GET", fact_url, headers={}) as response:
                 if response.status == 200:
                     data = await response.json()
                     embed = Embed(title=f"{animal.title()} fact",
                                   description=data["fact"],
                                   color=ctx.author.colour)
+                    if image_link is not None:
+                        embed.set_image(url=image_link)
                     await ctx.send(embed=embed)
 # old way, just passing the fact, now we are embedding it
 #                    await ctx.send(data["fact"])
@@ -101,6 +111,19 @@ class Fun(Cog):
                 name = pokemondata["name"]
                 height = pokemondata["height"] / 10
                 weight = pokemondata["weight"] / 10
+
+                # this is equivalent to combining them next to each other
+                # sprites = pokemondata["sprites"]
+                # sprites_url = sprites["front_default"]
+
+                sprites_url = pokemondata["sprites"]["front_default"]
+                async with request("GET", sprites_url, headers={}) as response1:
+                    if response1.status == 200:
+                        embed = Embed(title=f"{pokemonname}",
+                              color=ctx.author.colour)
+                        embed.set_image(url=sprites_url)
+                        await ctx.send(embed=embed)
+
                 await ctx.send(f"{name} weighs {weight}kg and is {height} meters tall")
             else:
                 await ctx.send(f"API returned a {response.status} status")
