@@ -5,9 +5,10 @@ from glob import glob
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from discord import Embed, File
+from discord.errors import HTTPException, Forbidden
 from discord.ext.commands import Bot as BotBase
-from discord.ext.commands import CommandNotFound
 from discord.ext.commands import Context
+from discord.ext.commands import (CommandNotFound, BadArgument, MissingRequiredArgument)
 
 # Importing my database
 from ..db import db
@@ -21,6 +22,7 @@ OWNER_IDS = [263423150346338304]
 # reference to where all the COGS are, or in this case, commands for the bot
 COGS = [path.split("\\")[-1][:-3] for path in glob("./lib/cogs/*.py")]
 
+IGNORE_EXCEPTIONS = (CommandNotFound, BadArgument)
 
 # this is a class to check and make sure the cogs are ready for use
 class Ready(object):
@@ -97,12 +99,27 @@ class Bot(BotBase):
         await self.stdout.send("An error occurred.")
         raise
 
+    # on errors occurring, this spits out the messages "something went wrong" and "An error occurred"
+    # By adding in the BadArguement or CommandNotFound, we are preventing the extra messages from displaying.
+    # The HTTPException will throw if the message can't send
+    # The Forbidden instance is for when the bot tries to do something it doesn't have permissions for
     async def on_command_error(self, ctx, exc):
         if isinstance(exc, CommandNotFound):
             pass
-
+        elif isinstance(exc, BadArgument):
+            pass
+        elif isinstance(exc, HTTPException):
+            await ctx.send("Unable to send message.")
+        elif isinstance(exc, Forbidden):
+            await ctx.send("I don't have permission for that")
+        elif isinstance(exc, MissingRequiredArgument):
+            await ctx.send("1 or more required arguments are missing")
         else:
             raise exc
+    # could also make and use the list defined above.
+    # if any([isinstance(exc, error) for error in IGNORE_EXCEPTIONS])
+    #   pass (or whatever code you want for all those specific exceptions.
+
 
     # This is where the bot box and the image appear on load-up.  Happens once the bot is running.
     async def on_ready(self):

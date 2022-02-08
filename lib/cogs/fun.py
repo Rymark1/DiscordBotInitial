@@ -1,7 +1,8 @@
 from random import choice, randint
 
-from discord.ext.commands import Cog
+from discord.ext.commands import Cog, BadArgument
 from discord.ext.commands import command
+from discord.errors import HTTPException
 from discord import Member
 from typing import Optional
 
@@ -19,9 +20,19 @@ class Fun(Cog):
     @command(name="dice", aliases=["roll"])
     async def roll_dice(self, ctx, die_string: str):
         dice, value = (int(term) for term in die_string.split("d"))
-        rolls = [randint(1, value) for i in range(dice)]
+        if dice <= 25:
+            rolls = [randint(1, value) for i in range(dice)]
 
-        await ctx.send(ctx.author.mention + "  " + " + ".join([str(r) for r in rolls]) + f" = {sum(rolls)}")
+            await ctx.send(ctx.author.mention + "  " + " + ".join([str(r) for r in rolls]) + f" = {sum(rolls)}")
+        else:
+            await ctx.send("Please limit number of dice between 1 -25.")
+
+    # # outputs the error if we get an http error sent back.  Probably better to do that with a limiting on the dice
+    # # they can choose, but I'm learnings so here we are
+    # @roll_dice.error
+    # async def roll_dice_error(self, ctx, exc):
+    #     if isinstance(exc.original, HTTPException):
+    #         await ctx.send("results overflow error. Please try a lower number.")
 
     # +slap @username for being a twat
     # the argument * makes it so "for being a twat" is a single argument
@@ -37,6 +48,11 @@ class Fun(Cog):
         else:
             await ctx.message.delete()
             await ctx.send(f"{ctx.author.name} slapped {member.display_name} {reason}!")
+
+    @slap_member.error
+    async def slap_member_error(self, ctx,exc):
+        if isinstance(exc, BadArgument):
+            await ctx.send("Unable to find that member.")
 
     # bot deletes what you say, then relays it back at you
     @command(name="echo", aliases=["say"])
