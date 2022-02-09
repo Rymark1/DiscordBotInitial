@@ -1,12 +1,10 @@
 from asyncio import sleep
-from io import BytesIO
 from random import choice, randint
 
-import discord
 from aiohttp import request
 
-from discord.ext.commands import Cog, BadArgument
-from discord.ext.commands import command
+from discord.ext.commands import Cog, BadArgument, BucketType
+from discord.ext.commands import command, cooldown
 from discord.errors import HTTPException
 from discord import Member, Embed
 from typing import Optional
@@ -17,12 +15,14 @@ class Fun(Cog):
         self.bot = bot
 
     # the choice function allows a variety of choices that will occur randomly.  Important to note that both sets of () are needed
-    @command(name="hello", aliases=["hi"])
+    @command(name="hello", aliases=["hi"], brief="Introductions")
     async def say_hello(self, ctx):
         await ctx.send(f"{choice(('Hello', 'Hi', 'Hey', 'Piss is as piss does', 'Yoooo'))} {ctx.author.mention}!")
 
     # Uses a random class to roll dice and output the results.
-    @command(name="dice", aliases=["roll"])
+    @command(name="dice", aliases=["roll"], brief="Roll Dice")
+    # the arguments are (# of times command is called before cooldown, time in seconds, type or level of cooldown)
+    @cooldown(1, 10, BucketType.user)
     async def roll_dice(self, ctx, die_string: str):
         dice, value = (int(term) for term in die_string.split("d"))
         if dice <= 25:
@@ -46,7 +46,7 @@ class Fun(Cog):
     # author.display_name returns name inside server
     # author.mention returns the @username
 
-    @command(name="slap", aliases=["hit"])
+    @command(name="slap", aliases=["hit"], brief="Slap some peeps")
     async def slap_member(self, ctx, member: Member, *, reason: Optional[str] = "for no reason"):
         if member.id == self.bot.user.id:
             await ctx.send(f"{self.bot.user} slapped {ctx.author.name} for fun!")
@@ -57,25 +57,27 @@ class Fun(Cog):
             await ctx.send(f"{ctx.author.name} slapped {member.display_name} {reason}!")
 
     @slap_member.error
-    async def slap_member_error(self, ctx,exc):
+    async def slap_member_error(self, ctx, exc):
         if isinstance(exc, BadArgument):
             await ctx.send("Unable to find that member.")
 
     # bot deletes what you say, then relays it back at you
-    @command(name="echo", aliases=["say"])
+    @command(name="echo", aliases=["say"], brief="Shout into the void")
+    @cooldown(1, 15, BucketType.guild)
     async def echo_message(self, ctx, *, message):
         await ctx.message.delete()
         await ctx.send(message)
 
     # First direct API request.  We load the URL, with the specific API which spits bad a string of raw data, then load
     # and use that if a positive status (200) is returned
-    @command(name="fact")
+    @command(name="fact", brief="Animal facts")
+    @cooldown(3, 60, BucketType.guild)
     async def animal_fact(self, ctx, animal: str):
         if (animal := animal.lower()) in ("dog", "cat", "panda", "fox", "bird", "koala"):
             fact_url = f"https://some-random-api.ml/facts/{animal}"
             image_url = f"https://some-random-api.ml/img/{'birb' if animal == 'bird' else animal}"
 
-            async with request("GET", image_url,headers={}) as response:
+            async with request("GET", image_url, headers={}) as response:
                 if response.status == 200:
                     data = await response.json()
                     image_link = data["link"]
@@ -102,8 +104,11 @@ class Fun(Cog):
     # once we have the postive hit via to 200 status, we can then load the data into pokemon data, then directly
     # reference the individual fields needed which are available in their api documentation.
     #
-    @command(name="pokemon")
-    async def pokemon_fact(self, ctx, pokemonname: str):
+
+    # need to make optional argument not equal to None to start.  Otherwise null error occurs.
+    @command(name="pokemon", brief="Pokemon info")
+    @cooldown(1, 10, BucketType.guild)
+    async def pokemon_fact(self, ctx, pokemonname: str, shiny: Optional[str] = " "):
         URL = f"https://pokeapi.co/api/v2/pokemon/{pokemonname.lower()}"
         async with request("GET", URL, headers={}) as response:
             if response.status == 200:
@@ -115,8 +120,10 @@ class Fun(Cog):
                 # this is equivalent to combining them next to each other
                 # sprites = pokemondata["sprites"]
                 # sprites_url = sprites["front_default"]
-
-                sprites_url = pokemondata["sprites"]["front_default"]
+                if shiny.lower() == "shiny":
+                    sprites_url = pokemondata["sprites"]["front_shiny"]
+                else:
+                    sprites_url = pokemondata["sprites"]["front_default"]
                 async with request("GET", sprites_url, headers={}) as response1:
                     if response1.status == 200:
                         embed = Embed(title=f"{pokemonname}",

@@ -8,7 +8,7 @@ from discord import Embed, File
 from discord.errors import HTTPException, Forbidden
 from discord.ext.commands import Bot as BotBase
 from discord.ext.commands import Context
-from discord.ext.commands import (CommandNotFound, BadArgument, MissingRequiredArgument)
+from discord.ext.commands import (CommandNotFound, BadArgument, MissingRequiredArgument, CommandOnCooldown)
 
 # Importing my database
 from ..db import db
@@ -104,16 +104,20 @@ class Bot(BotBase):
     # The HTTPException will throw if the message can't send
     # The Forbidden instance is for when the bot tries to do something it doesn't have permissions for
     async def on_command_error(self, ctx, exc):
-        if isinstance(exc, CommandNotFound):
+        if any([isinstance(exc, error) for error in IGNORE_EXCEPTIONS]):
             pass
-        elif isinstance(exc, BadArgument):
-            pass
-        elif isinstance(exc, HTTPException):
-            await ctx.send("Unable to send message.")
-        elif isinstance(exc, Forbidden):
-            await ctx.send("I don't have permission for that")
         elif isinstance(exc, MissingRequiredArgument):
             await ctx.send("1 or more required arguments are missing")
+        elif isinstance(exc, CommandOnCooldown):
+            await ctx.send(f"Please wait.  The command is cooling off for {exc.retry_after:,.2f} seconds. "
+                           f"{str(exc.cooldown.type).split('.')[-1]} cooldown.")
+        elif hasattr(exc, "original"):
+            # if isinstance(exc, HTTPException):
+            # await ctx.send("Unable to send message.")
+            if isinstance(exc.original, Forbidden):
+                await ctx.send("I don't have permission for that")
+            else:
+                raise exc.original
         else:
             raise exc
     # could also make and use the list defined above.
