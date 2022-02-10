@@ -93,8 +93,8 @@ class Fun(Cog):
                     if image_link is not None:
                         embed.set_image(url=image_link)
                     await ctx.send(embed=embed)
-# old way, just passing the fact, now we are embedding it
-#                    await ctx.send(data["fact"])
+                # old way, just passing the fact, now we are embedding it
+                #                    await ctx.send(data["fact"])
                 else:
                     await ctx.send(f"API returned a {response.status} status")
         else:
@@ -127,13 +127,42 @@ class Fun(Cog):
                 async with request("GET", sprites_url, headers={}) as response1:
                     if response1.status == 200:
                         embed = Embed(title=f"{shiny} {pokemonname}",
-                              color=ctx.author.colour)
+                                      color=ctx.author.colour)
                         embed.set_image(url=sprites_url)
                         await ctx.send(embed=embed)
 
                 await ctx.send(f"{name} weighs {weight}kg and is {height} meters tall")
             else:
                 await ctx.send(f"API returned a {response.status} status")
+
+    @command(name="rps", brief="Rock Paper Scissors")
+    async def rock_paper_scissors(self, ctx, playerthrow: str):
+        accepted_strings = {'rock', 'paper', "scissors"}
+        # assigned playerthrow.lower() to playerthrow inline
+        if (playerthrow := playerthrow.lower()) in accepted_strings:
+            cputhrow = choice(('rock', 'paper', 'scissors'))
+            if cputhrow == playerthrow:
+                await ctx.send(
+                    f"{ctx.author.name} threw {playerthrow} and {self.bot.user} threw {cputhrow}.  You tied!")
+            else:
+                if (cputhrow == "rock" and playerthrow == "scissors") or \
+                        (cputhrow == "paper" and playerthrow == "rock") or \
+                        (cputhrow == "scissors" and playerthrow == "paper"):
+                    await ctx.send(f"{ctx.author.name} threw {playerthrow} and {self.bot.user} threw {cputhrow}.  You "
+                                   f"lose.")
+                else:
+                    await ctx.send(f"{ctx.author.name} threw {playerthrow} and {self.bot.user} threw {cputhrow}.  You "
+                                   f"win.")
+        else:
+            await ctx.send(f"Please enter a valid throw.")
+
+    @command(name="gamble", brief="Win the Lottery")
+    async def gamble(self, ctx, number: int):
+        winningnbr = randint(1, randint(1, 1000))
+        if number is winningnbr:
+            await ctx.send(f"Congrats {ctx.author.name}!  Ryan owes you a dollar.")
+        else:
+            await ctx.send("Please venmo Ryan a dollar or the police will arrive at your house shortly.")
 
     @Cog.listener()
     async def on_ready(self):
