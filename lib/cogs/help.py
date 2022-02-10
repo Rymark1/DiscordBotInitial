@@ -7,6 +7,7 @@ from discord.ext.menus import MenuPages, ListPageSource
 from discord.ext.commands import Cog
 from discord.ext.commands import command
 
+
 # function to have the output line show the command|aliases, then required arguments
 # in <> and optional in <>
 # then returns the created items
@@ -16,29 +17,30 @@ def syntax(cmd):
 
     for key, value in cmd.params.items():
         if key not in ("self", "ctx"):
+            # ternary operator.  syntax is (true expression) if (condition) else (false expression)
             params.append(f"[{key}]" if 'Optional' in str(value) else f"<{key}>")
-
     params = " ".join(params)
 
     return f"'{cmd_and_aliases} {params}'"
+
 
 # help menu main class.  We control the look and feel of the pages as they show.
 class HelpMenu(ListPageSource):
     def __init__(self, ctx, data):
         self.ctx = ctx
-# determins number of items per page
+        # determins number of items per page
         super().__init__(data, per_page=3)
 
-# sets up how the box looks on the screen.
+    # sets up how the box looks on the screen.
     async def write_page(self, menu, fields=[]):
-        offset = (menu.current_page*self.per_page) + 1
+        offset = (menu.current_page * self.per_page) + 1
         len_data = len(self.entries)
 
         embed = Embed(title="Help",
                       description="Welcome to the Botty help dialog!",
                       colour=self.ctx.author.colour)
         embed.set_thumbnail(url=self.ctx.guild.me.avatar_url)
-        embed.set_footer(text=f"{offset:,} - {min(len_data, offset+self.per_page-1):,} of {len_data:,} commands.")
+        embed.set_footer(text=f"{offset:,} - {min(len_data, offset + self.per_page - 1):,} of {len_data:,} commands.")
 
         for name, value in fields:
             embed.add_field(name=name, value=value, inline=False)
@@ -64,7 +66,7 @@ class Help(Cog):
                       description=syntax(command),
                       colour=ctx.author.colour)
         embed.add_field(name="Command description", value=command.help)
-        await ctx.send(embed= embed)
+        await ctx.send(embed=embed)
 
     @command(name="help", brief="Halp")
     async def show_help(self, ctx, cmd: Optional[str]):

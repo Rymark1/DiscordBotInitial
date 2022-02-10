@@ -9,12 +9,13 @@ from discord.errors import HTTPException, Forbidden
 from discord.ext.commands import Bot as BotBase
 from discord.ext.commands import Context
 from discord.ext.commands import (CommandNotFound, BadArgument, MissingRequiredArgument, CommandOnCooldown)
+from discord.ext.commands import when_mentioned_or, command, has_permissions
 
 # Importing my database
 from ..db import db
 
-# customizable prefix
-PREFIX = "+"
+# # customizable prefix
+# PREFIX = "+"
 
 # my personal ID on steam.  Can be found by enabling developer options and right clicking a name.
 OWNER_IDS = [263423150346338304]
@@ -38,11 +39,17 @@ class Ready(object):
         return all([getattr(self, cog) for cog in COGS])
 
 
+def get_prefix(bot, message):
+    prefix = db.field("SELECT Prefix FROM Guilds WHERE GuildID = ?", message.guild.id)
+    return when_mentioned_or(prefix)(bot, message)
+
+
 # the actual class of the bot.
 class Bot(BotBase):
     # initial startup where variables get set and paths get defined
     def __init__(self):
-        self.PREFIX = PREFIX
+        # # this is the setting of the prefix
+        # self.PREFIX = PREFIX
         self.ready = False
         self.cogs_ready = Ready()
 
@@ -50,7 +57,9 @@ class Bot(BotBase):
         self.scheduler = AsyncIOScheduler()
 
         db.autosave(self.scheduler)
-        super().__init__(command_prefix=PREFIX, owner_ids=OWNER_IDS)
+        # changing this from command_prefix=PREFIX to
+        # command_prefix=get_prefix
+        super().__init__(command_prefix=get_prefix, owner_ids=OWNER_IDS)
 
     # initial startup of Cogs
     def setup(self):

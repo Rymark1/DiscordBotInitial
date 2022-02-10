@@ -106,7 +106,7 @@ class Fun(Cog):
     #
 
     # need to make optional argument not equal to None to start.  Otherwise null error occurs.
-    @command(name="pokemon", brief="Pokemon info")
+    @command(name="pokemon", aliases=["Pokémon"], brief="Pokemon info")
     @cooldown(1, 10, BucketType.guild)
     async def pokemon_fact(self, ctx, pokemonname: str, shiny: Optional[str] = " "):
         URL = f"https://pokeapi.co/api/v2/pokemon/{pokemonname.lower()}"
@@ -126,7 +126,7 @@ class Fun(Cog):
                     sprites_url = pokemondata["sprites"]["front_default"]
                 async with request("GET", sprites_url, headers={}) as response1:
                     if response1.status == 200:
-                        embed = Embed(title=f"{pokemonname}",
+                        embed = Embed(title=f"{shiny} {pokemonname}",
                               color=ctx.author.colour)
                         embed.set_image(url=sprites_url)
                         await ctx.send(embed=embed)
