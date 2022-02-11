@@ -4,7 +4,7 @@ from glob import glob
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
-from discord import Embed, File
+from discord import Embed, File, Intents
 from discord.errors import HTTPException, Forbidden
 from discord.ext.commands import Bot as BotBase
 from discord.ext.commands import Context
@@ -59,7 +59,9 @@ class Bot(BotBase):
         db.autosave(self.scheduler)
         # changing this from command_prefix=PREFIX to
         # command_prefix=get_prefix
-        super().__init__(command_prefix=get_prefix, owner_ids=OWNER_IDS)
+        super().__init__(command_prefix=get_prefix,
+                         owner_ids=OWNER_IDS,
+                         intents=Intents.all())
 
     # initial startup of Cogs
     def setup(self):
