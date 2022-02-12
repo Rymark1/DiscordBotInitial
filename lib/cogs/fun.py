@@ -106,10 +106,15 @@ class Fun(Cog):
     #
 
     # need to make optional argument not equal to None to start.  Otherwise null error occurs.
-    @command(name="pokemon", aliases=["Pokémon"], brief="Pokemon info")
+    @command(name="pokemon", aliases=["Pokémon"], brief="syntax is <pokemon name>, (<shiny> or <no>), [unown type] ")
     @cooldown(1, 10, BucketType.guild)
-    async def pokemon_fact(self, ctx, pokemonname: str, shiny: Optional[str] = " "):
+    async def pokemon_fact(self, ctx, pokemonname: str, shiny: str = " ", unowntype: Optional[str] = " "):
         URL = f"https://pokeapi.co/api/v2/pokemon/{pokemonname.lower()}"
+        unowntype = unowntype.lower()
+        shiny = " " if shiny.lower() != "shiny" else "shiny"
+        shiny = shiny.lower()
+
+        pokemonname = pokemonname.lower()
         async with request("GET", URL, headers={}) as response:
             if response.status == 200:
                 pokemondata = await response.json()
@@ -120,12 +125,31 @@ class Fun(Cog):
                 # this is equivalent to combining them next to each other
                 # sprites = pokemondata["sprites"]
                 # sprites_url = sprites["front_default"]
-                if shiny.lower() == "shiny":
+                if pokemonname == "unown" and len(unowntype) == 1 and unowntype != " ":
+                    if unowntype == "?":
+                        unownnbr = 27
+                    elif unowntype == "!":
+                        unownnbr = 26
+                    else:
+                        unownnbr = ord(unowntype) - 97
+                    if unownnbr < 0 or unownnbr > 27:
+                        unownnbr = 0
+                    unown_URL = pokemondata["forms"][unownnbr]["url"]
+                    async with request("GET", unown_URL, headers={}) as response1:
+                        response1.raise_for_status()
+                        if response1.status == 200:
+                            unowndata = await response1.json()
+                            if shiny == "shiny":
+                                sprites_url = unowndata["sprites"]["front_shiny"]
+                            else:
+                                sprites_url = unowndata["sprites"]["front_default"]
+                elif shiny == "shiny":
                     sprites_url = pokemondata["sprites"]["front_shiny"]
                 else:
                     sprites_url = pokemondata["sprites"]["front_default"]
-                async with request("GET", sprites_url, headers={}) as response1:
-                    if response1.status == 200:
+
+                async with request("GET", sprites_url, headers={}) as response:
+                    if response.status == 200:
                         embed = Embed(title=f"{shiny} {pokemonname}",
                                       color=ctx.author.colour)
                         embed.set_image(url=sprites_url)
@@ -134,6 +158,11 @@ class Fun(Cog):
                 await ctx.send(f"{name} weighs {weight}kg and is {height} meters tall")
             else:
                 await ctx.send(f"API returned a {response.status} status")
+
+    @pokemon_fact.error
+    async def pokemon_fact_error(self, ctx, exc):
+        if isinstance(exc, BadArgument):
+            await ctx.send("Please enter valid/all arguments")
 
     @command(name="rps", brief="Rock Paper Scissors")
     async def rock_paper_scissors(self, ctx, playerthrow: str):

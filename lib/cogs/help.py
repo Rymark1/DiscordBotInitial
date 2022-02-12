@@ -37,7 +37,7 @@ class HelpMenu(ListPageSource):
         len_data = len(self.entries)
 
         embed = Embed(title="Help",
-                      description="Welcome to the Botty help dialog!",
+                      description="Welcome to the Botty help dialog! Required arguments are in <> optional are in []",
                       colour=self.ctx.author.colour)
         embed.set_thumbnail(url=self.ctx.guild.me.avatar_url)
         embed.set_footer(text=f"{offset:,} - {min(len_data, offset + self.per_page - 1):,} of {len_data:,} commands.")
@@ -65,7 +65,7 @@ class Help(Cog):
         embed = Embed(title=f"Help with `{command}`",
                       description=syntax(command),
                       colour=ctx.author.colour)
-        embed.add_field(name="Command description", value=command.help)
+        embed.add_field(name="Command description", value=command.brief)
         await ctx.send(embed=embed)
 
     @command(name="help", brief="Halp")
