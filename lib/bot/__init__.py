@@ -144,18 +144,20 @@ class Bot(BotBase):
             self.scheduler.add_job(self.rules_reminder, CronTrigger(day_of_week=0, hour=12, minute=0, second=0))
             self.scheduler.start()
 
-            embed = Embed(title="Now online!", description="Botty is now online.",
-                          colour=0xFF0000, timestamp=datetime.utcnow())
-            fields = [("Name", "Value", True),
-                      ("Another field", "This field is next to the other one.", True),
-                      ("A non-inline field", "This field will appear on it's own row.", False)]
-            for name, value, inline in fields:
-                embed.add_field(name=name, value=value, inline=inline)
-            embed.set_author(name="Ryan's Bot", icon_url=self.guild.icon_url)
-            embed.set_footer(text="This is a footer!")
-            await self.stdout.send(embed=embed)
+            # commenting out the inital embed until I can put useful information.
+            # embed = Embed(title="Now online!", description="Botty is now online.",
+            #               colour=0xFF0000, timestamp=datetime.utcnow())
+            # fields = [("Name", "Value", True),
+            #           ("Another field", "This field is next to the other one.", True),
+            #           ("A non-inline field", "This field will appear on it's own row.", False)]
+            # for name, value, inline in fields:
+            #     embed.add_field(name=name, value=value, inline=inline)
+            # embed.set_author(name="Ryan's Bot", icon_url=self.guild.icon_url)
+            # embed.set_footer(text="This is a footer!")
+            # await self.stdout.send(embed=embed)
 
-            await self.stdout.send(file=File("./data/images/profile.png"))
+            # commenting out the pigeon
+            # await self.stdout.send(file=File("./data/images/profile.png"))
 
             while not self.cogs_ready.all_ready():
                 await sleep(0.5)

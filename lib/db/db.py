@@ -6,7 +6,8 @@ from apscheduler.triggers.cron import CronTrigger
 DB_PATH = "./data/db/database.db"
 BUILD_PATH = "./data/db/build.sql"
 
-cxn = connect(DB_PATH, check_same_thread=False)
+# isolation level makes it so we don't have to commit after an execute is done.
+cxn = connect(DB_PATH, check_same_thread=False, isolation_level=None)
 cur = cxn.cursor()
 
 
