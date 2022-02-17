@@ -107,6 +107,7 @@ class Bot(BotBase):
         if err == "on_command_error":
             await args[0].send("Something went wrong.")
 
+        await self.stdout.send(err)
         await self.stdout.send("An error occurred.")
         raise
 
@@ -134,7 +135,6 @@ class Bot(BotBase):
     # could also make and use the list defined above.
     # if any([isinstance(exc, error) for error in IGNORE_EXCEPTIONS])
     #   pass (or whatever code you want for all those specific exceptions.
-
 
     # This is where the bot box and the image appear on load-up.  Happens once the bot is running.
     async def on_ready(self):
