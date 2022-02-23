@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Optional
 from discord import Member, Embed
 from discord.ext.commands import Cog, Greedy
-from discord.ext.commands import CheckFailure
+from discord.ext.commands import CheckFailure, MissingPermissions
 from discord.ext.commands import command, has_permissions, bot_has_permissions
 
 
@@ -10,6 +10,16 @@ from discord.ext.commands import command, has_permissions, bot_has_permissions
 class Mod(Cog):
     def __init__(self, bot):
         self.bot = bot
+
+    @command(name="shutdown")
+    @has_permissions(kick_members=True)
+    async def shutdown(self, ctx):
+        await self.bot.close()
+
+    @shutdown.error
+    async def shutdown_error(self, ctx, exc):
+        if isinstance(exc, CheckFailure):
+            await ctx.send("Insufficient permissions to perform that task.")
 
     @command(name="kick")
     @bot_has_permissions(kick_members=True)

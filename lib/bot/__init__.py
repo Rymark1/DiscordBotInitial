@@ -103,11 +103,11 @@ class Bot(BotBase):
     async def on_disconnect(self):
         print("bot disconnected")
 
+
     async def on_error(self, err, *args, **kwargs):
         if err == "on_command_error":
             await args[0].send("Something went wrong.")
 
-        await self.stdout.send(err)
         await self.stdout.send("An error occurred.")
         raise
 
@@ -141,7 +141,7 @@ class Bot(BotBase):
         if not self.ready:
             self.guild = self.get_guild(939559318787858433)
             self.stdout = self.get_channel(939559318787858436)
-            self.scheduler.add_job(self.rules_reminder, CronTrigger(day_of_week=0, hour=12, minute=0, second=0))
+            # self.scheduler.add_job(self.rules_reminder, CronTrigger(day_of_week=0, hour=12, minute=0, second=0))
             self.scheduler.start()
 
             # commenting out the inital embed until I can put useful information.
