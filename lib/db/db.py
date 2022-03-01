@@ -1,5 +1,5 @@
 from os.path import isfile
-from sqlite3 import connect
+import sqlite3
 
 from apscheduler.triggers.cron import CronTrigger
 
@@ -7,7 +7,7 @@ DB_PATH = "./data/db/database.db"
 BUILD_PATH = "./data/db/build.sql"
 
 # isolation level makes it so we don't have to commit after an execute is done.
-cxn = connect(DB_PATH, check_same_thread=False, isolation_level=None)
+cxn = sqlite3.connect(DB_PATH, check_same_thread=False, isolation_level=None)
 cur = cxn.cursor()
 
 
@@ -38,6 +38,7 @@ def close():
 
 
 def field(command, *values):
+	cur.row_factory = sqlite3.Row
 	cur.execute(command, tuple(values))
 
 	if (fetch := cur.fetchone()) is not None:
@@ -45,28 +46,33 @@ def field(command, *values):
 
 
 def record(command, *values):
+	cur.row_factory = sqlite3.Row
 	cur.execute(command, tuple(values))
 
 	return cur.fetchone()
 
 
 def records(command, *values):
+	cur.row_factory = sqlite3.Row
 	cur.execute(command, tuple(values))
 
 	return cur.fetchall()
 
 
 def column(command, *values):
+	cur.row_factory = sqlite3.Row
 	cur.execute(command, tuple(values))
 
 	return [item[0] for item in cur.fetchall()]
 
 
 def execute(command, *values):
+	cur.row_factory = sqlite3.Row
 	cur.execute(command, tuple(values))
 
 
 def multiexec(command, valueset):
+	cur.row_factory = sqlite3.Row
 	cur.executemany(command, valueset)
 
 

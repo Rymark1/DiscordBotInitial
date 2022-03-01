@@ -20,7 +20,7 @@ class Fun(Cog):
         await ctx.send(f"{choice(('Hello', 'Hi', 'Hey', 'Piss is as piss does', 'Yoooo'))} {ctx.author.mention}!")
 
     # Uses a random class to roll dice and output the results.
-    @command(name="dice", aliases=["roll"], brief="Roll Dice")
+    @command(name="dice", brief="Roll Dice")
     # the arguments are (# of times command is called before cooldown, time in seconds, type or level of cooldown)
     @cooldown(1, 10, BucketType.user)
     async def roll_dice(self, ctx, die_string: str):
