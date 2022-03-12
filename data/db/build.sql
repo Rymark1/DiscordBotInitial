@@ -36,7 +36,8 @@ CREATE TABLE IF NOT EXISTS craps_board (
     i_horn_3 integer DEFAULT 0,
     i_horn_11 integer DEFAULT 0,
     i_horn_12 integer DEFAULT 0,
-    i_horny integer DEFAULT 0
+    i_horny integer DEFAULT 0,
+    i_field integer DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS craps_current (

@@ -103,7 +103,6 @@ class Bot(BotBase):
     async def on_disconnect(self):
         print("bot disconnected")
 
-
     async def on_error(self, err, *args, **kwargs):
         if err == "on_command_error":
             await args[0].send("Something went wrong.")
@@ -162,7 +161,7 @@ class Bot(BotBase):
             while not self.cogs_ready.all_ready():
                 await sleep(0.5)
 
-            await self.stdout.send("Now online!")
+            # await self.stdout.send("Now online!")
             self.ready = True
             print("bot ready")
 
