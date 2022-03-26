@@ -1,9 +1,9 @@
 import asyncio
 from typing import Optional
-
-from discord.ext.commands import Cog, command, MissingRequiredArgument, cooldown, BucketType
-
+from discord.ext.commands import Cog, command
 from ..db import db
+
+MASTER_RECORD = 1
 
 
 # help menu main class.  We control the look and feel of the pages as they show.
@@ -12,7 +12,7 @@ class CrapsBets(Cog):
         self.bot = bot
 
     # pass line bet can only happen while craps_bank is active and no point has been set.
-    @command(name="passline")
+    @command(name="passline", aliases=["pl"])
     async def pass_bet(self, ctx, bet: int, remove: Optional[str] = ""):
         check_list, = await asyncio.gather((CrapsBets.check_bet(self, ctx, bet, remove)))
         valid_bet = check_list[0]
@@ -20,12 +20,16 @@ class CrapsBets(Cog):
         if not valid_bet:
             return
 
-        point = db.field("SELECT i_point FROM craps_current WHERE n_dummy=?", 1)
-        if point is not None and point != 0:
+        board_list = await asyncio.gather(self.get_master_record(ctx))
+        point, shooter, current_roll, user = board_list[0]
+        if point != 0:
             await ctx.send("You can't bet the pass line once the come-out roll has happened.")
             return
+        if ctx.message.author.id == shooter and remove == "r":
+            await ctx.send("You can't remove the bet as the shooter.")
+            return
 
-        dont_pass = db.field("SELECT i_dont FROM craps_board WHERE n_UserID=?", 1)
+        dont_pass = db.field("SELECT i_dont FROM craps_board WHERE n_UserID=?", ctx.message.author.id)
         if dont_pass is None:
             dont_pass = 0
         if dont_pass != 0:
@@ -41,12 +45,14 @@ class CrapsBets(Cog):
             db.execute(f"UPDATE craps_board SET i_pass = ? WHERE n_UserID = ?", 0, ctx.author.id)
             balance += already_bet
             db.execute(f"UPDATE craps_bank SET bankRoll = ? WHERE UserID = ?", balance, ctx.author.id)
-            await ctx.send(f"${already_bet:,.2f} on the pass line is removed {ctx.author.name}. Balance is ${balance:,.2f}.")
+            await ctx.send(
+                f"${already_bet:,.2f} on the pass line is removed {ctx.author.name}. Balance is ${balance:,.2f}.")
         elif already_bet is not None and already_bet != 0:
             db.execute(f"UPDATE craps_board SET i_pass = ? WHERE n_UserID = ?", bet + already_bet, ctx.author.id)
             db.execute(f"UPDATE craps_bank SET bankRoll = ? WHERE UserID = ?", balance - bet, ctx.author.id)
-            await ctx.send(f"You added ${bet:,.2f} to your existing ${already_bet:,.2f} bet on the pass line. {ctx.author.name}. "
-                           f" Balance is ${balance - bet:,.2f}.")
+            await ctx.send(
+                f"You added ${bet:,.2f} to your existing ${already_bet:,.2f} bet on the pass line. {ctx.author.name}. "
+                f" Balance is ${balance - bet:,.2f}.")
         else:
             db.execute(f"UPDATE craps_board SET i_pass = ? WHERE n_UserID = ?", bet, ctx.author.id)
             balance -= bet
@@ -61,7 +67,7 @@ class CrapsBets(Cog):
         if not valid_bet:
             return
 
-        point = db.field("SELECT i_point FROM craps_current WHERE n_dummy=?", 1)
+        point = db.field("SELECT i_point FROM craps_current WHERE n_dummy=?", MASTER_RECORD)
         if point is not None and point != 0:
             await ctx.send("You can't bet the don't pass line once the come-out roll has happened.")
             return
@@ -80,7 +86,8 @@ class CrapsBets(Cog):
             db.execute(f"UPDATE craps_board SET i_dont = ? WHERE n_UserID = ?", 0, ctx.author.id)
             balance += already_bet
             db.execute(f"UPDATE craps_bank SET bankRoll = ? WHERE UserID = ?", balance, ctx.author.id)
-            await ctx.send(f"${already_bet:,.2f} on the don't pass line is removed {ctx.author.name}. Balance is ${balance:,.2f}.")
+            await ctx.send(
+                f"${already_bet:,.2f} on the don't pass line is removed {ctx.author.name}. Balance is ${balance:,.2f}.")
         elif already_bet is not None and already_bet != 0:
             db.execute(f"UPDATE craps_board SET i_dont = ? WHERE n_UserID = ?", bet + already_bet, ctx.author.id)
             db.execute(f"UPDATE craps_bank SET bankRoll = ? WHERE UserID = ?", balance - bet, ctx.author.id)
@@ -90,7 +97,8 @@ class CrapsBets(Cog):
             db.execute(f"UPDATE craps_board SET i_dont = ? WHERE n_UserID = ?", bet, ctx.author.id)
             balance -= bet
             db.execute(f"UPDATE craps_bank SET bankRoll = ? WHERE UserID = ?", balance, ctx.author.id)
-            await ctx.send(f"${bet:,.2f} on the don't pass line is accepted {ctx.author.name}. Balance is ${balance:,.2f}.")
+            await ctx.send(
+                f"${bet:,.2f} on the don't pass line is accepted {ctx.author.name}. Balance is ${balance:,.2f}.")
 
     @command(name="odds")
     async def odds_bet(self, ctx, bet: int, remove: Optional[str] = ""):
@@ -101,7 +109,7 @@ class CrapsBets(Cog):
         if not valid_bet:
             return
 
-        point = db.field("SELECT i_point FROM craps_current WHERE n_dummy=?", 1)
+        point = db.field("SELECT i_point FROM craps_current WHERE n_dummy=?", MASTER_RECORD)
         if point is None or point == 0:
             await ctx.send("You can't bet odds until after the come out roll.")
             return
@@ -133,9 +141,11 @@ class CrapsBets(Cog):
                     db.execute(f"UPDATE craps_board SET i_pass_odds = ? WHERE n_UserID = ?", 0, ctx.author.id)
                     balance += already_bet
                     db.execute(f"UPDATE craps_bank SET bankRoll = ? WHERE UserID = ?", balance, ctx.author.id)
-                    await ctx.send(f"${already_bet:,.2f} on the pass odds is removed {ctx.author.name}. Balance is ${balance:,.2f}.")
+                    await ctx.send(
+                        f"${already_bet:,.2f} on the pass odds is removed {ctx.author.name}. Balance is ${balance:,.2f}.")
                 elif already_bet is not None and already_bet != 0:
-                    db.execute(f"UPDATE craps_board SET i_pass_odds = ? WHERE n_UserID = ?", bet + already_bet, ctx.author.id)
+                    db.execute(f"UPDATE craps_board SET i_pass_odds = ? WHERE n_UserID = ?", bet + already_bet,
+                               ctx.author.id)
                     db.execute(f"UPDATE craps_bank SET bankRoll = ? WHERE UserID = ?", balance - bet, ctx.author.id)
                     await ctx.send(f"You added ${bet:,.2f} to your existing ${already_bet:,.2f} bet on pass odds "
                                    f" {ctx.author.name}.  Balance is ${balance - bet:,.2f}.")
@@ -143,7 +153,8 @@ class CrapsBets(Cog):
                     db.execute(f"UPDATE craps_board SET i_pass_odds = ? WHERE n_UserID = ?", bet, ctx.author.id)
                     balance -= bet
                     db.execute(f"UPDATE craps_bank SET bankRoll = ? WHERE UserID = ?", balance, ctx.author.id)
-                    await ctx.send(f"${bet:,.2f} on the pass odds is accepted {ctx.author.name}. Balance is ${balance:,.2f}.")
+                    await ctx.send(
+                        f"${bet:,.2f} on the pass odds is accepted {ctx.author.name}. Balance is ${balance:,.2f}.")
         if dont_pass_line > 0:
             if bet > max_dont_odds:
                 await ctx.send("You can't bet that much on odds.  The limit is 6x your bet.")
@@ -154,9 +165,11 @@ class CrapsBets(Cog):
                     db.execute(f"UPDATE craps_board SET i_dont_odds = ? WHERE n_UserID = ?", 0, ctx.author.id)
                     balance += already_bet
                     db.execute(f"UPDATE craps_bank SET bankRoll = ? WHERE UserID = ?", balance, ctx.author.id)
-                    await ctx.send(f"${already_bet:,.2f} on the don't pass odds is removed {ctx.author.name}. Balance is ${balance:,.2f}.")
+                    await ctx.send(
+                        f"${already_bet:,.2f} on the don't pass odds is removed {ctx.author.name}. Balance is ${balance:,.2f}.")
                 elif already_bet is not None and already_bet != 0:
-                    db.execute(f"UPDATE craps_board SET i_dont_odds = ? WHERE n_UserID = ?", bet + already_bet, ctx.author.id)
+                    db.execute(f"UPDATE craps_board SET i_dont_odds = ? WHERE n_UserID = ?", bet + already_bet,
+                               ctx.author.id)
                     db.execute(f"UPDATE craps_bank SET bankRoll = ? WHERE UserID = ?", balance - bet, ctx.author.id)
                     await ctx.send(f"You added ${bet:,.2f} to your existing ${already_bet:,.2f} bet on dont pass odds "
                                    f" {ctx.author.name}.  Balance is ${balance - bet:,.2f}.")
@@ -164,7 +177,8 @@ class CrapsBets(Cog):
                     db.execute(f"UPDATE craps_board SET i_dont_odds = ? WHERE n_UserID = ?", bet, ctx.author.id)
                     balance -= bet
                     db.execute(f"UPDATE craps_bank SET bankRoll = ? WHERE UserID = ?", balance, ctx.author.id)
-                    await ctx.send(f"${bet:,.2f} on the don't pass odds is accepted {ctx.author.name}. Balance is ${balance:,.2f}.")
+                    await ctx.send(
+                        f"${bet:,.2f} on the don't pass odds is accepted {ctx.author.name}. Balance is ${balance:,.2f}.")
 
     @command(name="place")
     async def place_bet(self, ctx, number: int, bet: int, remove: Optional[str] = ""):
@@ -176,7 +190,7 @@ class CrapsBets(Cog):
         if not valid_bet:
             return
 
-        point = db.field("SELECT i_point FROM craps_current WHERE n_dummy=?", 1)
+        point = db.field("SELECT i_point FROM craps_current WHERE n_dummy=?", MASTER_RECORD)
         if point is None or point == 0:
             await ctx.send("Please wait until a valid point is hit " + ctx.author.name)
         elif number not in valid:
@@ -192,9 +206,11 @@ class CrapsBets(Cog):
                 db.execute(f"UPDATE craps_board SET {db_var_name} = ? WHERE n_UserID = ?", 0, ctx.author.id)
                 balance += already_bet
                 db.execute(f"UPDATE craps_bank SET bankRoll = ? WHERE UserID = ?", balance, ctx.author.id)
-                await ctx.send(f"${already_bet:,.2f} on the {str(number)} place bet is removed {ctx.author.name}. Balance is ${balance:,.2f}.")
+                await ctx.send(
+                    f"${already_bet:,.2f} on the {str(number)} place bet is removed {ctx.author.name}. Balance is ${balance:,.2f}.")
             elif already_bet is not None and already_bet != 0:
-                db.execute(f"UPDATE craps_board SET {db_var_name} = ? WHERE n_UserID = ?", bet + already_bet, ctx.author.id)
+                db.execute(f"UPDATE craps_board SET {db_var_name} = ? WHERE n_UserID = ?", bet + already_bet,
+                           ctx.author.id)
                 db.execute(f"UPDATE craps_bank SET bankRoll = ? WHERE UserID = ?", balance - bet, ctx.author.id)
                 await ctx.send(f"You added ${bet:,.2f} to your existing ${already_bet:,.2f} bet on the {str(number)} "
                                f"place bet. {ctx.author.name}.  Balance is ${balance - bet:,.2f}.")
@@ -202,7 +218,8 @@ class CrapsBets(Cog):
                 db.execute(f"UPDATE craps_board SET {db_var_name} = ? WHERE n_UserID = ?", bet, ctx.author.id)
                 balance -= bet
                 db.execute(f"UPDATE craps_bank SET bankRoll = ? WHERE UserID = ?", balance, ctx.author.id)
-                await ctx.send(f"${bet:,.2f} on the {str(number)} place bet is accepted {ctx.author.name}. Balance is ${balance:,.2f}.")
+                await ctx.send(
+                    f"${bet:,.2f} on the {str(number)} place bet is accepted {ctx.author.name}. Balance is ${balance:,.2f}.")
 
     @command(name="hard")
     async def hard_way_bet(self, ctx, number: int, bet: int, remove: Optional[str] = ""):
@@ -214,7 +231,7 @@ class CrapsBets(Cog):
         if not valid_bet:
             return
 
-        point = db.field("SELECT i_point FROM craps_current WHERE n_dummy=?", 1)
+        point = db.field("SELECT i_point FROM craps_current WHERE n_dummy=?", MASTER_RECORD)
         if point is None or point == 0:
             await ctx.send("Please wait until a valid point is hit " + ctx.author.name)
         elif number not in valid:
@@ -229,9 +246,11 @@ class CrapsBets(Cog):
                 db.execute(f"UPDATE craps_board SET {db_var_name} = ? WHERE n_UserID = ?", 0, ctx.author.id)
                 balance += already_bet
                 db.execute(f"UPDATE craps_bank SET bankRoll = ? WHERE UserID = ?", balance, ctx.author.id)
-                await ctx.send(f"${bet:,.2f} on the {str(number)} hardway bet is removed {ctx.author.name}. Balance is ${balance:,.2f}.")
+                await ctx.send(
+                    f"${bet:,.2f} on the {str(number)} hardway bet is removed {ctx.author.name}. Balance is ${balance:,.2f}.")
             elif already_bet is not None and already_bet != 0:
-                db.execute(f"UPDATE craps_board SET {db_var_name} = ? WHERE n_UserID = ?", bet + already_bet, ctx.author.id)
+                db.execute(f"UPDATE craps_board SET {db_var_name} = ? WHERE n_UserID = ?", bet + already_bet,
+                           ctx.author.id)
                 db.execute(f"UPDATE craps_bank SET bankRoll = ? WHERE UserID = ?", balance - bet, ctx.author.id)
                 await ctx.send(f"You added ${bet:,.2f} to your existing ${already_bet:,.2f} bet on the hard "
                                f"{str(number)} {ctx.author.name}.  Balance is ${balance - bet:,.2f}.")
@@ -239,12 +258,47 @@ class CrapsBets(Cog):
                 db.execute(f"UPDATE craps_board SET {db_var_name} = ? WHERE n_UserID = ?", bet, ctx.author.id)
                 balance -= bet
                 db.execute(f"UPDATE craps_bank SET bankRoll = ? WHERE UserID = ?", balance, ctx.author.id)
-                await ctx.send(f"${bet:,.2f} on the {str(number)} hardway bet is accepted {ctx.author.name}. Balance is ${balance:,.2f}.")
+                await ctx.send(
+                    f"${bet:,.2f} on the {str(number)} hardway bet is accepted {ctx.author.name}. Balance is ${balance:,.2f}.")
+
+    # @command(name="allhard")
+    # async def hard_way_bet(self, ctx, bet: int, remove: Optional[str] = ""):
+    #     valid = [4, 5, 6, 8, 10]
+    #
+    #     check_list, = await asyncio.gather((CrapsBets.check_bet(self, ctx, bet, remove)))
+    #     valid_bet = check_list[0]
+    #     balance = check_list[1]
+    #     if not valid_bet:
+    #         return
+    #
+    #     point = db.field("SELECT i_point FROM craps_current WHERE n_dummy=?", 1)
+    #     if point is None or point == 0:
+    #         await ctx.send("Please wait until a valid point is hit " + ctx.author.name)
+    #     else:
+    #         point_info = db.field("SELECT * FROM craps_board WHERE n_UserID=?", ctx.author.id)
+    #         if point_info is None:
+    #             db.execute("INSERT INTO craps_board (n_UserID) VALUES (?)", ctx.author.id)
+    #         already_bet = db.field(f"SELECT {db_var_name} FROM craps_board WHERE n_UserID=?", ctx.author.id)
+    #         if remove.lower() == "r":
+    #             db.execute(f"UPDATE craps_board SET {db_var_name} = ? WHERE n_UserID = ?", 0, ctx.author.id)
+    #             balance += already_bet
+    #             db.execute(f"UPDATE craps_bank SET bankRoll = ? WHERE UserID = ?", balance, ctx.author.id)
+    #             await ctx.send(f"${bet:,.2f} on the {str(number)} hardway bet is removed {ctx.author.name}. Balance is ${balance:,.2f}.")
+    #         elif already_bet is not None and already_bet != 0:
+    #             db.execute(f"UPDATE craps_board SET {db_var_name} = ? WHERE n_UserID = ?", bet + already_bet, ctx.author.id)
+    #             db.execute(f"UPDATE craps_bank SET bankRoll = ? WHERE UserID = ?", balance - bet, ctx.author.id)
+    #             await ctx.send(f"You added ${bet:,.2f} to your existing ${already_bet:,.2f} bet on the hard "
+    #                            f"{str(number)} {ctx.author.name}.  Balance is ${balance - bet:,.2f}.")
+    #         else:
+    #             db.execute(f"UPDATE craps_board SET {db_var_name} = ? WHERE n_UserID = ?", bet, ctx.author.id)
+    #             balance -= bet
+    #             db.execute(f"UPDATE craps_bank SET bankRoll = ? WHERE UserID = ?", balance, ctx.author.id)
+    #             await ctx.send(f"${bet:,.2f} on the {str(number)} hardway bet is accepted {ctx.author.name}. Balance is ${balance:,.2f}.")
 
     @command(name="horn")
-    async def horn_bet(self, ctx, number: int, bet:int, remove: Optional[str] = ""):
+    async def horn_bet(self, ctx, number: int, bet: int, remove: Optional[str] = ""):
         valid = [2, 3, 11, 12]
-       
+
         check_list, = await asyncio.gather((CrapsBets.check_bet(self, ctx, bet, remove)))
         valid_bet = check_list[0]
         balance = check_list[1]
@@ -263,9 +317,11 @@ class CrapsBets(Cog):
                 db.execute(f"UPDATE craps_board SET {db_var_name} = ? WHERE n_UserID = ?", 0, ctx.author.id)
                 balance += already_bet
                 db.execute(f"UPDATE craps_bank SET bankRoll = ? WHERE UserID = ?", balance, ctx.author.id)
-                await ctx.send(f"One time ${bet:,.2f} bet on the {str(number)} is removed {ctx.author.name}. Balance is ${balance:,.2f}.")
+                await ctx.send(
+                    f"One time ${bet:,.2f} bet on the {str(number)} is removed {ctx.author.name}. Balance is ${balance:,.2f}.")
             elif already_bet is not None and already_bet != 0:
-                db.execute(f"UPDATE craps_board SET {db_var_name} = ? WHERE n_UserID = ?", bet + already_bet, ctx.author.id)
+                db.execute(f"UPDATE craps_board SET {db_var_name} = ? WHERE n_UserID = ?", bet + already_bet,
+                           ctx.author.id)
                 db.execute(f"UPDATE craps_bank SET bankRoll = ? WHERE UserID = ?", balance - bet, ctx.author.id)
                 await ctx.send(f"You added ${bet:,.2f} to your existing ${already_bet:,.2f} one time bet on the "
                                f"{str(number)} {ctx.author.name}.  Balance is ${balance - bet:,.2f}.")
@@ -273,7 +329,8 @@ class CrapsBets(Cog):
                 db.execute(f"UPDATE craps_board SET {db_var_name} = ? WHERE n_UserID = ?", bet, ctx.author.id)
                 balance -= bet
                 db.execute(f"UPDATE craps_bank SET bankRoll = ? WHERE UserID = ?", balance, ctx.author.id)
-                await ctx.send(f"One time ${bet:,.2f} bet on the {str(number)} is accepted {ctx.author.name}. Balance is ${balance:,.2f}.")
+                await ctx.send(
+                    f"One time ${bet:,.2f} bet on the {str(number)} is accepted {ctx.author.name}. Balance is ${balance:,.2f}.")
 
     @command(name="allhorn", aliases=["horny"])
     async def horn_all_bet(self, ctx, bet: int, remove: Optional[str] = ""):
@@ -292,7 +349,8 @@ class CrapsBets(Cog):
             db.execute("UPDATE craps_board SET i_horny = ? WHERE n_UserID = ?", 0, ctx.author.id)
             balance += already_bet
             db.execute(f"UPDATE craps_bank SET bankRoll = ? WHERE UserID = ?", balance, ctx.author.id)
-            await ctx.send(f"One time ${bet:,.2f} on the horn is removed {ctx.author.name}. Balance is ${balance:,.2f}.")
+            await ctx.send(
+                f"One time ${bet:,.2f} on the horn is removed {ctx.author.name}. Balance is ${balance:,.2f}.")
         elif already_bet is not None and already_bet != 0:
             db.execute(f"UPDATE craps_board SET i_horny = ? WHERE n_UserID = ?", bet + already_bet, ctx.author.id)
             db.execute(f"UPDATE craps_bank SET bankRoll = ? WHERE UserID = ?", balance - bet, ctx.author.id)
@@ -302,14 +360,15 @@ class CrapsBets(Cog):
             db.execute(f"UPDATE craps_board SET i_horny = ? WHERE n_UserID = ?", bet, ctx.author.id)
             balance -= bet
             db.execute(f"UPDATE craps_bank SET bankRoll = ? WHERE UserID = ?", balance, ctx.author.id)
-            await ctx.send(f"One time ${bet:,.2f} on the horn is accepted {ctx.author.name}. Balance is ${balance:,.2f}.")
+            await ctx.send(
+                f"One time ${bet:,.2f} on the horn is accepted {ctx.author.name}. Balance is ${balance:,.2f}.")
 
     @command(name="evens")
     async def evens(self, ctx, bet: int, remove: Optional[str] = ""):
         await ctx.send(f"Skip, This is craps.")
 
     @command(name="field")
-    async def horn_bet(self, ctx, bet:int, remove: Optional[str] = ""):
+    async def horn_bet(self, ctx, bet: int, remove: Optional[str] = ""):
         check_list, = await asyncio.gather((CrapsBets.check_bet(self, ctx, bet, remove)))
         valid_bet = check_list[0]
         balance = check_list[1]
@@ -325,7 +384,8 @@ class CrapsBets(Cog):
             db.execute("UPDATE craps_board SET i_field = ? WHERE n_UserID = ?", 0, ctx.author.id)
             balance += already_bet
             db.execute(f"UPDATE craps_bank SET bankRoll = ? WHERE UserID = ?", balance, ctx.author.id)
-            await ctx.send(f"One time ${bet:,.2f} on the horn is removed {ctx.author.name}. Balance is ${balance:,.2f}.")
+            await ctx.send(
+                f"One time ${bet:,.2f} on the horn is removed {ctx.author.name}. Balance is ${balance:,.2f}.")
         elif already_bet is not None and already_bet != 0:
             db.execute(f"UPDATE craps_board SET i_field = ? WHERE n_UserID = ?", bet + already_bet, ctx.author.id)
             db.execute(f"UPDATE craps_bank SET bankRoll = ? WHERE UserID = ?", balance - bet, ctx.author.id)
@@ -335,7 +395,8 @@ class CrapsBets(Cog):
             db.execute(f"UPDATE craps_board SET i_field = ? WHERE n_UserID = ?", bet, ctx.author.id)
             balance -= bet
             db.execute(f"UPDATE craps_bank SET bankRoll = ? WHERE UserID = ?", balance, ctx.author.id)
-            await ctx.send(f"One time ${bet:,.2f} bet on the field is accepted {ctx.author.name}. Balance is ${balance:,.2f}.")
+            await ctx.send(
+                f"One time ${bet:,.2f} bet on the field is accepted {ctx.author.name}. Balance is ${balance:,.2f}.")
 
     async def check_bet(self, ctx, bet: int, remove: str):
         if ctx.channel.id != self.craps_channel.id:
@@ -356,6 +417,16 @@ class CrapsBets(Cog):
             return [False, balance]
         else:
             return [True, balance]
+
+    async def get_master_record(self, ctx):
+        """returns control record `tuple` (point, shooter, current roll, discord user ID)"""
+        row = db.record("SELECT * FROM craps_current WHERE n_dummy = ?", MASTER_RECORD)
+
+        point = 0 if row['i_point'] is None else row['i_point']
+        shooter = 0 if row['b_shooter'] is None else row['b_shooter']
+        user = self.bot.get_user(shooter) if shooter != 0 else 0
+        current_roll = 0 if row['i_roll_nbr'] is None else row['i_roll_nbr']
+        return point, shooter, current_roll, user
 
     @Cog.listener()
     async def on_ready(self):

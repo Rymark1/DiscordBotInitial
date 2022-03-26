@@ -4,6 +4,8 @@ from discord.ext.commands import Cog, command, cooldown, BucketType
 
 from ..db import db
 
+MASTER_RECORD = 1
+
 
 # help menu main class.  We control the look and feel of the pages as they show.
 class CrapsBank(Cog):
@@ -40,7 +42,7 @@ class CrapsBank(Cog):
                     await ctx.send(f"You've already placed bets down. {ctx.message.author.name}")
                     return
 
-            point = db.field("SELECT i_point FROM craps_current WHERE n_dummy=?", 1)
+            point = db.field("SELECT i_point FROM craps_current WHERE n_dummy=?", MASTER_RECORD)
             if point is None:
                 point = 0
             if point != 0:

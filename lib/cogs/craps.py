@@ -10,6 +10,8 @@ from lib.craps_support.crap_resolve import CrapsResolve
 from lib.craps_support.craps_phrases import CrapsPhrases
 from ..db import db
 
+MASTER_RECORD = 1
+
 
 class Craps(Cog):
     def __init__(self, bot):
@@ -38,9 +40,25 @@ class Craps(Cog):
         except Error:
             pass
 
-        db.execute("INSERT INTO craps_current (n_dummy) VALUES (?)", 1)
+        db.execute("INSERT INTO craps_current (n_dummy) VALUES (?)", MASTER_RECORD)
         await ctx.send("Welcome to Craps.  Everyone place your passline bets and a shooter will be selected.  "
                        "Once all bets are in, use the command 'shooter''.")
+
+    @command(name="biglose")
+    @has_permissions(manage_guild=True)
+    async def big_lose(self, ctx):
+        # only work in craps channel
+        if ctx.channel.id != self.craps_channel.id:
+            return
+
+        db.execute("UPDATE craps_current SET b_shooter = ?, i_point = ?, i_roll_nbr = ?"
+                   " WHERE n_dummy = ?", 0, 0, 0, MASTER_RECORD)
+        rows = db.records("SELECT * FROM craps_board")
+        for row in rows:
+            user_id = row['n_UserID']
+            db.execute("DELETE FROM craps_board WHERE n_UserID=?", user_id)
+            db.execute("INSERT INTO craps_board (n_UserID) VALUES (?)", user_id)
+        await ctx.send("Ha, got emmmmmm.")
 
     @command(name="restartcraps")
     @has_permissions(manage_guild=True)
@@ -98,44 +116,53 @@ class Craps(Cog):
         if ctx.channel.id != self.craps_channel.id:
             return
 
-        curr_shooter = db.field("SELECT b_shooter FROM craps_current WHERE n_dummy=?", 1)
-        if curr_shooter is not None and curr_shooter != 0:
-            if ctx.message.author.id != curr_shooter:
-                await ctx.send(f"Only the shooter can pass the dice {ctx.message.author.name}")
-                return
+        board_list = await asyncio.gather(self.get_master_record(ctx))
+        point, shooter, current_roll, user = board_list[0]
 
-        shooters = []
-        rows = db.records("SELECT * FROM craps_board")
-        for row in rows:
-            if row['i_pass'] != 0:
-                shooters.append(row['n_UserID'])
-        if shooters[0] is None:
-            await ctx.send("No one has bet on the pass line.")
+        if ctx.message.author.id != shooter and shooter != 0:
+            await ctx.send(f"Only the shooter can pass the dice {ctx.message.author.name}")
             return
-        shooter_id = randint(0, len(shooters) - 1)
-        db.execute("UPDATE craps_current SET b_shooter = ? WHERE n_dummy = ?", shooters[shooter_id], 1)
-        user = self.bot.get_user(shooters[shooter_id])
+        if point != 0:
+            await ctx.send(f"Bro, what are you doing?  Keep shooting {ctx.message.author.name}")
+            return
+
+        shooters_list = []
+        rows = db.records("SELECT * FROM craps_board WHERE i_pass != (?)", 0)
+        for row in rows:
+            if shooter != row['n_UserID']:
+                shooters_list.append(row['n_UserID'])
+
+        if not shooters_list:
+            await ctx.send("No one else has bet on the pass line.") if ctx.message.author.id == shooter else await \
+                ctx.send("No one else has bet on the pass line.")
+            return
+
+        shooter_id = randint(0, len(shooters_list) - 1)
+        db.execute("UPDATE craps_current SET b_shooter = ? WHERE n_dummy = ?", shooters_list[shooter_id], MASTER_RECORD)
+        user = self.bot.get_user(shooters_list[shooter_id])
         await ctx.send("The shooter is " + user.name)
 
     # this command will start craps.  From there we'll have the 1 table row that will now exist.
     # It will allow bets to be placed.
-    @command(name="roll")
-    @cooldown(1, 10, BucketType.user)
+    @command(name="roll", aliases=["shoot", "bones", "toss"])
+    @cooldown(1, 4, BucketType.user)
     async def roll_dice(self, ctx):
         # only work in craps channel
         if ctx.channel.id != self.craps_channel.id:
             return
-        shooter_id = db.field("SELECT b_shooter FROM craps_current WHERE n_dummy=?", 1)
-        if shooter_id is None:
+
+        board_list = await asyncio.gather(self.get_master_record(ctx))
+        point, shooter, current_roll, user = board_list[0]
+
+        if shooter == 0:
             await ctx.send("Shooter hasn't been chosen yet.")
             return
-        if ctx.author.id != shooter_id:
+        if ctx.author.id != shooter:
             await ctx.send(ctx.author.name + " You are not the shooter.  Stop.")
             return
 
         # updating current die roll
-        die_roll = db.field("SELECT i_roll_nbr FROM craps_current WHERE n_dummy=?", 1) + 1
-        db.execute("UPDATE craps_current SET i_roll_nbr = ? WHERE n_dummy = ?", die_roll, 1)
+        db.execute("UPDATE craps_current SET i_roll_nbr = ? WHERE n_dummy = ?", current_roll + 1, MASTER_RECORD)
 
         # printing bets, then waiting 4 seconds, then rolling
         await ctx.send("Current Bets on the board:")
@@ -148,13 +175,13 @@ class Craps(Cog):
 
         # embedding image to return dice roll
         die_roll_url = f"{str(die1)}{str(die2)}.png"
-        embed = Embed(title=f"Roll {die_roll}",
+        embed = Embed(title='Comeout Roll' if current_roll == 0 else f'Roll {current_roll}',
                       colour=0xFF0000,
                       timestamp=datetime.utcnow())
 
         file = File(f"./data/images/{die_roll_url}", filename="image.png")
         embed.set_image(url="attachment://image.png")
-        phrase, = await asyncio.gather((CrapsPhrases.choose_phrase(self, ctx, die1, die2)))
+        phrase, = await asyncio.gather(CrapsPhrases.choose_phrase(self, ctx, die1, die2))
         embed.set_footer(text=phrase)
         await ctx.send(file=file, embed=embed)
         await asyncio.gather((CrapsPhrases.send_outcome_message(self, ctx, die1, die2)))
@@ -217,16 +244,23 @@ class Craps(Cog):
         # only work in craps channel
         if ctx.channel.id != self.craps_channel.id:
             return
-        row = db.record("SELECT * FROM craps_current WHERE n_dummy = ?", 1)
-        if row is None:
-            return
 
-        if row['b_shooter'] is None or row['b_shooter'] == 0:
-            await ctx.send(f"Current point: {row['i_point']}\tCurrent shooter: N/A\tCurrent roll: {row['i_roll_nbr']}")
-        else:
-            user = self.bot.get_user(row['b_shooter'])
-            await ctx.send(f"Current point: {row['i_point']}\tCurrent shooter: {user.name}\tCurrent roll:"
-                           f" {row['i_roll_nbr']}")
+        board_list = await asyncio.gather(self.get_master_record(ctx))
+        point, shooter, current_roll, user = board_list[0]
+
+        await ctx.send(f"Current point: {'Comeout Roll' if point == 0 else point}"
+                       f"\tCurrent shooter: {'N/A' if point == 0 else user.name}"
+                       f"\tCurrent roll: {current_roll}")
+
+    async def get_master_record(self, ctx):
+        """returns control record `tuple` (point, shooter, current roll, discord user ID)"""
+        row = db.record("SELECT * FROM craps_current WHERE n_dummy = ?", MASTER_RECORD)
+
+        point = 0 if row['i_point'] is None else row['i_point']
+        shooter = 0 if row['b_shooter'] is None else row['b_shooter']
+        current_roll = 0 if row['i_roll_nbr'] is None else row['i_roll_nbr']
+        user = self.bot.get_user(shooter) if shooter != 0 else 0
+        return point, shooter, current_roll, user
 
     @Cog.listener()
     async def on_ready(self):
