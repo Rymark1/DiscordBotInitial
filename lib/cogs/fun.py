@@ -56,6 +56,13 @@ class Fun(Cog):
             await ctx.message.delete()
             await ctx.send(f"{ctx.author.name} slapped {member.display_name} {reason}!")
 
+    @command(name="doctorate", aliases=["doc", "phd"], brief="Get a white coat!")
+    async def doctorate(self, ctx, degree: Optional[str] = "failing"):
+        curr_nickname = ctx.message.author.name
+        await ctx.message.author.edit(nick=f"{curr_nickname}: Doctor of {degree}")
+        await ctx.send(f"{ctx.author.name} Now has a degree from ASU in {degree}!")
+
+
     @slap_member.error
     async def slap_member_error(self, ctx, exc):
         if isinstance(exc, BadArgument):
